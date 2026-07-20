@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection,
-  addDoc,
+  doc,
   getDocs,
   query,
-  where,
   serverTimestamp,
+  where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -27,10 +28,9 @@ const startingForm = {
   phone: "",
   service: "Haircut",
   date: "",
-  time: "10:00 AM",
+  time: "",
 };
 
-// Gets today's date using the visitor's local timezone
 function getTodayDate() {
   const today = new Date();
   const year = today.getFullYear();
@@ -40,7 +40,6 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
-// Formats a phone number like (905) 555-1234
 function formatPhoneNumber(value) {
   const numbers = value.replace(/\D/g, "").slice(0, 10);
 
@@ -55,14 +54,99 @@ function formatPhoneNumber(value) {
   return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6)}`;
 }
 
+function createSlotId(date, time) {
+  const cleanedTime = time
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return `${date}_${cleanedTime}`;
+}
+
 export default function BookingForm() {
   const [form, setForm] = useState(startingForm);
+  const [bookedTimes, setBookedTimes] = useState([]);
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false);
 
-  function update(e) {
-    const { name, value } = e.target;
+  const availableTimes = useMemo(() => {
+    return times.filter((time) => !bookedTimes.includes(time));
+  }, [bookedTimes]);
+
+  useEffect(() => {
+    if (!form.date) {
+      setBookedTimes([]);
+
+      setForm((currentForm) => ({
+        ...currentForm,
+        time: "",
+      }));
+
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadBookedTimes() {
+      setIsLoadingTimes(true);
+      setStatus("");
+      setStatusType("");
+
+      try {
+        const bookedSlotsQuery = query(
+          collection(db, "bookedSlots"),
+          where("date", "==", form.date)
+        );
+
+        const snapshot = await getDocs(bookedSlotsQuery);
+
+        if (!isActive) return;
+
+        const unavailableTimes = snapshot.docs.map(
+          (slotDocument) => slotDocument.data().time
+        );
+
+        setBookedTimes(unavailableTimes);
+
+        const firstAvailableTime = times.find(
+          (time) => !unavailableTimes.includes(time)
+        );
+
+        setForm((currentForm) => ({
+          ...currentForm,
+          time: firstAvailableTime || "",
+        }));
+      } catch (error) {
+        console.error("Error loading booked times:", error);
+
+        if (!isActive) return;
+
+        setBookedTimes([]);
+        setStatus("Could not load available times. Please refresh and try again.");
+        setStatusType("error");
+
+        setForm((currentForm) => ({
+          ...currentForm,
+          time: "",
+        }));
+      } finally {
+        if (isActive) {
+          setIsLoadingTimes(false);
+        }
+      }
+    }
+
+    loadBookedTimes();
+
+    return () => {
+      isActive = false;
+    };
+  }, [form.date]);
+
+  function update(event) {
+    const { name, value } = event.target;
 
     setStatus("");
     setStatusType("");
@@ -73,8 +157,8 @@ export default function BookingForm() {
     }));
   }
 
-  async function book(e) {
-    e.preventDefault();
+  async function book(event) {
+    event.preventDefault();
 
     if (isSubmitting) return;
 
@@ -82,21 +166,18 @@ export default function BookingForm() {
     const phoneNumbers = form.phone.replace(/\D/g, "");
     const today = getTodayDate();
 
-    // Name validation
     if (trimmedName.length < 2) {
       setStatus("Please enter your full name.");
       setStatusType("error");
       return;
     }
 
-    // Phone validation
     if (phoneNumbers.length !== 10) {
       setStatus("Please enter a valid 10-digit phone number.");
       setStatusType("error");
       return;
     }
 
-    // Date validation
     if (!form.date) {
       setStatus("Please choose an appointment date.");
       setStatusType("error");
@@ -109,37 +190,31 @@ export default function BookingForm() {
       return;
     }
 
-    // Time validation
     if (!form.time) {
-      setStatus("Please choose an appointment time.");
+      setStatus("There are no available times for this date.");
+      setStatusType("error");
+      return;
+    }
+
+    if (!availableTimes.includes(form.time)) {
+      setStatus("That time is no longer available. Please choose another.");
       setStatusType("error");
       return;
     }
 
     setIsSubmitting(true);
-    setStatus("Checking availability...");
+    setStatus("Booking your appointment...");
     setStatusType("loading");
 
     try {
-      const bookingsRef = collection(db, "bookings");
+      const slotId = createSlotId(form.date, form.time);
 
-      const availabilityQuery = query(
-        bookingsRef,
-        where("date", "==", form.date),
-        where("time", "==", form.time)
-      );
+      const bookingReference = doc(db, "bookings", slotId);
+      const slotReference = doc(db, "bookedSlots", slotId);
 
-      const existingBookings = await getDocs(availabilityQuery);
+      const batch = writeBatch(db);
 
-      if (!existingBookings.empty) {
-        setStatus("That time is already booked. Please choose another time.");
-        setStatusType("error");
-        return;
-      }
-
-      setStatus("Booking your appointment...");
-
-      await addDoc(bookingsRef, {
+      batch.set(bookingReference, {
         name: trimmedName,
         phone: formatPhoneNumber(phoneNumbers),
         service: form.service,
@@ -149,6 +224,18 @@ export default function BookingForm() {
         createdAt: serverTimestamp(),
       });
 
+      batch.set(slotReference, {
+        date: form.date,
+        time: form.time,
+        createdAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      setBookedTimes((currentTimes) => [
+        ...new Set([...currentTimes, form.time]),
+      ]);
+
       setStatus("Appointment booked! We look forward to seeing you.");
       setStatusType("success");
       setForm(startingForm);
@@ -157,7 +244,7 @@ export default function BookingForm() {
 
       if (error.code === "permission-denied") {
         setStatus(
-          "Firebase blocked the booking. Check your Firestore security rules."
+          "That time may have just been booked. Choose another time and try again."
         );
       } else {
         setStatus("Something went wrong. Please try again.");
@@ -171,6 +258,8 @@ export default function BookingForm() {
 
   const fieldClasses =
     "block w-full min-w-0 max-w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base text-white outline-none transition focus:border-yellow-400 disabled:cursor-not-allowed disabled:opacity-50";
+
+  const formDisabled = isSubmitting;
 
   return (
     <div className="w-full min-w-0 max-w-full">
@@ -190,7 +279,7 @@ export default function BookingForm() {
             required
             minLength={2}
             maxLength={50}
-            disabled={isSubmitting}
+            disabled={formDisabled}
             autoComplete="name"
             className={fieldClasses}
           />
@@ -209,7 +298,7 @@ export default function BookingForm() {
             onChange={update}
             required
             maxLength={14}
-            disabled={isSubmitting}
+            disabled={formDisabled}
             autoComplete="tel"
             inputMode="tel"
             className={fieldClasses}
@@ -223,7 +312,7 @@ export default function BookingForm() {
             name="service"
             value={form.service}
             onChange={update}
-            disabled={isSubmitting}
+            disabled={formDisabled}
             className={fieldClasses}
           >
             <option value="Haircut">Haircut</option>
@@ -243,7 +332,7 @@ export default function BookingForm() {
             onChange={update}
             required
             min={getTodayDate()}
-            disabled={isSubmitting}
+            disabled={formDisabled}
             className={fieldClasses}
           />
         </label>
@@ -255,20 +344,53 @@ export default function BookingForm() {
             name="time"
             value={form.time}
             onChange={update}
-            disabled={isSubmitting}
+            disabled={
+              formDisabled ||
+              isLoadingTimes ||
+              !form.date ||
+              availableTimes.length === 0
+            }
+            required
             className={fieldClasses}
           >
-            {times.map((time) => (
-              <option key={time} value={time}>
-                {time}
-              </option>
-            ))}
+            {!form.date && <option value="">Choose a date first</option>}
+
+            {form.date && isLoadingTimes && (
+              <option value="">Loading available times...</option>
+            )}
+
+            {form.date &&
+              !isLoadingTimes &&
+              availableTimes.length === 0 && (
+                <option value="">No times available</option>
+              )}
+
+            {form.date &&
+              !isLoadingTimes &&
+              availableTimes.map((time) => (
+                <option key={time} value={time}>
+                  {time}
+                </option>
+              ))}
           </select>
+
+          {form.date &&
+            !isLoadingTimes &&
+            availableTimes.length === 0 && (
+              <span className="text-sm font-semibold text-red-400">
+                This date is fully booked. Please choose another date.
+              </span>
+            )}
         </label>
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={
+            formDisabled ||
+            isLoadingTimes ||
+            !form.date ||
+            availableTimes.length === 0
+          }
           className="mt-1 w-full max-w-full rounded-xl bg-yellow-400 px-4 py-4 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? "Booking..." : "Book Now"}
