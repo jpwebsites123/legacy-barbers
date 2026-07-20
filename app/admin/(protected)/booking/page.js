@@ -12,7 +12,7 @@ import {
   query,
   updateDoc,
 } from "firebase/firestore";
-import { auth, db } from "../../lib/firebase";
+import { auth, db } from "../../../../lib/firebase";
 
 const timeOrder = [
   "10:00 AM",
