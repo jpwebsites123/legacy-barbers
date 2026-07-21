@@ -4,29 +4,41 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  Image,
+  LayoutDashboard,
+  LogOut,
+  Scissors,
+  Settings,
+  Star,
+  Umbrella,
+} from "lucide-react";
 import { auth } from "../../../lib/firebase";
 
 const mainLinks = [
   {
     name: "Dashboard",
     href: "/admin",
-    icon: "⌂",
+    icon: LayoutDashboard,
   },
   {
     name: "Bookings",
     href: "/admin/bookings",
-    icon: "▣",
+    icon: CalendarDays,
   },
 ];
 
 const comingSoonLinks = [
-  { name: "Settings", icon: "⚙" },
-  { name: "Services", icon: "✂" },
-  { name: "Business Hours", icon: "◷" },
-  { name: "Vacation Days", icon: "☀" },
-  { name: "Gallery", icon: "▧" },
-  { name: "Reviews", icon: "★" },
-  { name: "Analytics", icon: "↗" },
+  { name: "Settings", icon: Settings },
+  { name: "Services", icon: Scissors },
+  { name: "Business Hours", icon: Clock3 },
+  { name: "Vacation Days", icon: Umbrella },
+  { name: "Gallery", icon: Image },
+  { name: "Reviews", icon: Star },
+  { name: "Analytics", icon: BarChart3 },
 ];
 
 export default function AdminLayout({ children }) {
@@ -85,28 +97,26 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-black text-white lg:flex">
-      <aside className="border-b border-zinc-800 bg-zinc-950 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r">
-        <div className="flex items-center justify-between px-5 py-5 lg:block lg:px-6 lg:py-7">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-yellow-400">
-              Legacy Barbers
-            </p>
+      <aside className="flex border-b border-zinc-800 bg-zinc-950 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r">
+        <div className="w-full">
+          <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-5 lg:px-6 lg:py-6">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-yellow-400">
+                Legacy Barbers
+              </p>
 
-            <h1 className="mt-1 text-2xl font-black">Admin Panel</h1>
+              <h1 className="mt-1 text-2xl font-black">Admin Panel</h1>
+            </div>
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-400 text-black">
+              <Scissors size={22} strokeWidth={2.5} />
+            </div>
           </div>
 
-          <div className="rounded-xl bg-yellow-400 px-3 py-2 text-xl text-black">
-            ✂
-          </div>
-        </div>
-
-        <div className="border-t border-zinc-800 px-4 py-4 lg:px-5">
-          <p className="mb-3 hidden px-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-600 lg:block">
-            Management
-          </p>
-
-          <nav className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+          <nav className="flex gap-2 overflow-x-auto px-4 py-4 lg:flex-col lg:overflow-visible lg:px-5">
             {mainLinks.map((link) => {
+              const Icon = link.icon;
+
               const isActive =
                 pathname === link.href ||
                 (link.href !== "/admin" &&
@@ -122,46 +132,44 @@ export default function AdminLayout({ children }) {
                       : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
                   }`}
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/10 text-lg">
-                    {link.icon}
-                  </span>
-
-                  {link.name}
+                  <Icon size={20} strokeWidth={2.2} />
+                  <span>{link.name}</span>
                 </Link>
               );
             })}
           </nav>
-        </div>
 
-        <div className="hidden border-t border-zinc-800 px-5 py-5 lg:block">
-          <p className="mb-3 px-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-600">
-            Coming Soon
-          </p>
+          <div className="hidden border-t border-zinc-800 px-5 py-5 lg:block">
+            <p className="mb-3 px-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-600">
+              Coming Soon
+            </p>
 
-          <div className="space-y-1">
-            {comingSoonLinks.map((link) => (
-              <div
-                key={link.name}
-                className="flex cursor-not-allowed items-center justify-between rounded-xl px-4 py-3 text-zinc-600"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-7 w-7 items-center justify-center text-lg">
-                    {link.icon}
-                  </span>
+            <div className="space-y-1">
+              {comingSoonLinks.map((link) => {
+                const Icon = link.icon;
 
-                  <span className="font-medium">{link.name}</span>
-                </div>
+                return (
+                  <div
+                    key={link.name}
+                    className="flex items-center justify-between rounded-xl px-4 py-2.5 text-zinc-600"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon size={18} />
+                      <span className="text-sm font-medium">{link.name}</span>
+                    </div>
 
-                <span className="rounded-full border border-zinc-800 px-2 py-1 text-[10px] font-bold uppercase">
-                  Soon
-                </span>
-              </div>
-            ))}
+                    <span className="rounded-full border border-zinc-800 px-2 py-1 text-[9px] font-bold uppercase tracking-wider">
+                      Soon
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="border-t border-zinc-800 p-4 lg:absolute lg:bottom-0 lg:w-72 lg:p-5">
-          <div className="mb-3 hidden rounded-xl border border-zinc-800 bg-black p-4 lg:block">
+        <div className="hidden mt-auto border-t border-zinc-800 p-5 lg:block">
+          <div className="rounded-xl border border-zinc-800 bg-black p-4">
             <p className="text-xs uppercase tracking-wider text-zinc-500">
               Signed in as
             </p>
@@ -175,8 +183,9 @@ export default function AdminLayout({ children }) {
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="w-full rounded-xl border border-zinc-700 px-4 py-3 font-bold transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 px-4 py-3 font-bold transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
+            <LogOut size={19} />
             {loggingOut ? "Logging Out..." : "Log Out"}
           </button>
         </div>
