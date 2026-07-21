@@ -1,8 +1,88 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
 import BookingForm from "../../components/BookingForm";
+import { db } from "../../lib/firebase";
+
+const defaultSettings = {
+  bookingMonth: "July 2026",
+  bookingsOpen: true,
+  bookingOpenDate: "",
+  bookingOpenTime: "10:00",
+};
+
+function formatTime(time) {
+  if (!time) return "10:00 AM";
+
+  const [hours, minutes] = time.split(":");
+  const hourNumber = Number(hours);
+
+  if (Number.isNaN(hourNumber)) {
+    return time;
+  }
+
+  const period = hourNumber >= 12 ? "PM" : "AM";
+  const formattedHour = hourNumber % 12 || 12;
+
+  return `${formattedHour}:${minutes || "00"} ${period}`;
+}
+
+function formatDate(date) {
+  if (!date) return "";
+
+  const parsedDate = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return parsedDate.toLocaleDateString("en-CA", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function Book() {
-  const bookingsOpen = true;
-  const bookingMonth = "July 2026";
+  const [settings, setSettings] = useState(defaultSettings);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [settingsError, setSettingsError] = useState("");
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const settingsReference = doc(db, "settings", "business");
+        const settingsSnapshot = await getDoc(settingsReference);
+
+        if (settingsSnapshot.exists()) {
+          setSettings({
+            ...defaultSettings,
+            ...settingsSnapshot.data(),
+          });
+        }
+      } catch (error) {
+        console.error("Error loading booking settings:", error);
+        setSettingsError(
+          "We could not load the latest booking information."
+        );
+      } finally {
+        setLoadingSettings(false);
+      }
+    }
+
+    loadSettings();
+  }, []);
+
+  const {
+    bookingsOpen,
+    bookingMonth,
+    bookingOpenDate,
+    bookingOpenTime,
+  } = settings;
+
+  const formattedOpenTime = formatTime(bookingOpenTime);
+  const formattedOpenDate = formatDate(bookingOpenDate);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
@@ -34,25 +114,42 @@ export default function Book() {
                 Current Booking Month
               </p>
 
-              <h2 className="mt-3 text-2xl font-black sm:text-3xl">
-                {bookingMonth}
-              </h2>
+              {loadingSettings ? (
+                <div className="mt-4">
+                  <div className="h-9 w-40 animate-pulse rounded-lg bg-zinc-800" />
+                  <div className="mt-5 h-5 w-36 animate-pulse rounded-lg bg-zinc-800" />
+                </div>
+              ) : (
+                <>
+                  <h2 className="mt-3 text-2xl font-black sm:text-3xl">
+                    {bookingMonth}
+                  </h2>
 
-              <div className="mt-4 flex items-center gap-3 sm:mt-5">
-                <span
-                  className={`h-3 w-3 shrink-0 rounded-full ${
-                    bookingsOpen ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
+                  <div className="mt-4 flex items-center gap-3 sm:mt-5">
+                    <span
+                      className={`h-3 w-3 shrink-0 rounded-full ${
+                        bookingsOpen ? "bg-green-500" : "bg-red-500"
+                      }`}
+                    />
 
-                <p
-                  className={`text-sm font-bold sm:text-base ${
-                    bookingsOpen ? "text-green-400" : "text-red-400"
-                  }`}
-                >
-                  {bookingsOpen ? "Bookings Are Open" : "Fully Booked"}
+                    <p
+                      className={`text-sm font-bold sm:text-base ${
+                        bookingsOpen ? "text-green-400" : "text-red-400"
+                      }`}
+                    >
+                      {bookingsOpen
+                        ? "Bookings Are Open"
+                        : "Bookings Are Closed"}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {settingsError && (
+                <p className="mt-4 text-sm leading-relaxed text-yellow-400">
+                  {settingsError} Showing the default booking information.
                 </p>
-              </div>
+              )}
             </div>
 
             {/* Before You Book */}
@@ -99,7 +196,17 @@ export default function Book() {
 
           {/* Right Column */}
           <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-4 shadow-2xl sm:rounded-3xl sm:p-8">
-            {bookingsOpen ? (
+            {loadingSettings ? (
+              <div className="flex min-h-[420px] items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-yellow-400" />
+
+                  <p className="mt-4 text-zinc-400">
+                    Loading booking information...
+                  </p>
+                </div>
+              </div>
+            ) : bookingsOpen ? (
               <>
                 <div className="mb-6 min-w-0 sm:mb-8">
                   <h2 className="break-words text-2xl font-black sm:text-3xl">
@@ -124,16 +231,20 @@ export default function Book() {
                 </div>
 
                 <h2 className="mt-6 text-3xl font-black text-red-400 sm:mt-7 sm:text-4xl">
-                  Fully Booked
+                  Bookings Closed
                 </h2>
 
                 <p className="mx-auto mt-4 max-w-xl break-words text-sm text-zinc-400 sm:mt-5 sm:text-base">
-                  All appointments for {bookingMonth} have been filled.
+                  Appointments for {bookingMonth} are not currently available.
                 </p>
 
-                <p className="mt-4 break-words text-sm font-semibold text-white sm:text-base">
-                  August bookings open on August 1 at 10:00 AM.
-                </p>
+                {(formattedOpenDate || formattedOpenTime) && (
+                  <p className="mt-4 break-words text-sm font-semibold text-white sm:text-base">
+                    {formattedOpenDate
+                      ? `Bookings open on ${formattedOpenDate} at ${formattedOpenTime}.`
+                      : `Bookings open at ${formattedOpenTime}.`}
+                  </p>
+                )}
 
                 <a
                   href="/contact"
