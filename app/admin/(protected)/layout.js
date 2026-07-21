@@ -29,10 +29,14 @@ const mainLinks = [
     href: "/admin/bookings",
     icon: CalendarDays,
   },
+  {
+    name: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
+  },
 ];
 
 const comingSoonLinks = [
-  { name: "Settings", icon: Settings },
   { name: "Services", icon: Scissors },
   { name: "Business Hours", icon: Clock3 },
   { name: "Vacation Days", icon: Umbrella },
