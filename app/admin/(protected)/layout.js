@@ -37,6 +37,11 @@ const mainLinks = [
     icon: Scissors,
   },
   {
+    name: "Gallery",
+    href: "/admin/gallery",
+    icon: ImageIcon,
+  },
+  {
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
@@ -51,10 +56,6 @@ const comingSoonLinks = [
   {
     name: "Vacation Days",
     icon: Umbrella,
-  },
-  {
-    name: "Gallery",
-    icon: ImageIcon,
   },
   {
     name: "Reviews",
