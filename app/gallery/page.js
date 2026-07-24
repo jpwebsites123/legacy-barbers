@@ -1,102 +1,159 @@
-const photos = [
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+
+const defaultPhotos = [
   {
-    image: "/skinfade.png",
+    id: "skinfade",
+    imageUrl: "/skinfade.png",
     title: "Skin Fade",
     description: "Clean fade with a sharp finish.",
   },
   {
-    image: "/beard-lineup.png",
+    id: "beard-lineup",
+    imageUrl: "/beard-lineup.png",
     title: "Haircut & Beard",
     description: "Fresh cut paired with a detailed beard trim.",
   },
   {
-    image: "/classic-cut.png",
+    id: "classic-cut",
+    imageUrl: "/classic-cut.png",
     title: "Classic Cut",
     description: "Timeless style with a modern touch.",
   },
   {
-    image: "/sharp-lineup.png",
+    id: "sharp-lineup",
+    imageUrl: "/sharp-lineup.png",
     title: "Sharp Line Up",
     description: "Crisp edges and perfect detail.",
   },
   {
-    image: "/premium-grooming.png",
+    id: "premium-grooming",
+    imageUrl: "/premium-grooming.png",
     title: "Premium Grooming",
     description: "Professional grooming experience.",
   },
   {
-    image: "/shop-interior.png",
+    id: "shop-interior",
+    imageUrl: "/shop-interior.png",
     title: "Shop Interior",
     description: "A clean, modern barbershop built for comfort.",
   },
 ];
 
 export default function Gallery() {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPhotos() {
+      try {
+        const galleryQuery = query(
+          collection(db, "gallery"),
+          orderBy("createdAt", "desc")
+        );
+
+        const snapshot = await getDocs(galleryQuery);
+
+        const uploadedPhotos = snapshot.docs.map((galleryDoc) => ({
+          id: galleryDoc.id,
+          ...galleryDoc.data(),
+        }));
+
+        setPhotos(
+          uploadedPhotos.length > 0 ? uploadedPhotos : defaultPhotos
+        );
+      } catch (error) {
+        console.error("Error loading gallery:", error);
+
+        // Keep the original photos visible if Firestore fails.
+        setPhotos(defaultPhotos);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadPhotos();
+  }, []);
+
   return (
     <main className="min-h-screen bg-black text-white">
       {/* Hero */}
-      <section className="pt-32 pb-16 px-6 text-center">
-        <p className="uppercase tracking-[0.35em] text-yellow-400 font-semibold">
+      <section className="px-6 pb-16 pt-32 text-center">
+        <p className="font-semibold uppercase tracking-[0.35em] text-yellow-400">
           Legacy Barbers
         </p>
 
-        <h1 className="text-5xl md:text-6xl font-black mt-5">
+        <h1 className="mt-5 text-5xl font-black md:text-6xl">
           Our Gallery
         </h1>
 
-        <p className="text-zinc-400 max-w-2xl mx-auto mt-6 text-lg">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-400">
           Every cut is done with precision and attention to detail. Here&apos;s
           a look at some of our work.
         </p>
       </section>
 
       {/* Gallery Grid */}
-      <section className="pb-24 px-6">
-        <div className="max-w-7xl mx-auto grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {photos.map((photo) => (
-            <div
-              key={photo.title}
-              className="group relative h-80 overflow-hidden rounded-3xl border border-zinc-800 hover:border-yellow-400 transition duration-300"
-            >
-              <img
-                src={photo.image}
-                alt={photo.title}
-                className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
-              />
+      <section className="px-6 pb-24">
+        {loading ? (
+          <p className="text-center text-zinc-400">
+            Loading gallery...
+          </p>
+        ) : (
+          <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="group relative h-80 overflow-hidden rounded-3xl border border-zinc-800 transition duration-300 hover:border-yellow-400"
+              >
+                <img
+                  src={photo.imageUrl}
+                  alt={photo.title || "Legacy Barbers gallery image"}
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                />
 
-              {/* Transparent gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
-              {/* Text */}
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h2 className="text-2xl font-bold text-white">
-                  {photo.title}
-                </h2>
+                <div className="absolute bottom-0 left-0 right-0 p-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    {photo.title || "Legacy Barbers"}
+                  </h2>
 
-                <p className="text-zinc-200 mt-2 max-h-0 overflow-hidden opacity-0 group-hover:max-h-20 group-hover:opacity-100 transition-all duration-300">
-                  {photo.description}
-                </p>
+                  {photo.description && (
+                    <p className="mt-2 max-h-0 overflow-hidden text-zinc-200 opacity-0 transition-all duration-300 group-hover:max-h-20 group-hover:opacity-100">
+                      {photo.description}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Bottom CTA */}
-      <section className="bg-zinc-950 border-t border-zinc-800 py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="border-t border-zinc-800 bg-zinc-950 px-6 py-20">
+        <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-4xl font-black">
             Ready for Your Next Cut?
           </h2>
 
-          <p className="text-zinc-400 mt-6 text-lg">
+          <p className="mt-6 text-lg text-zinc-400">
             Join hundreds of satisfied clients and experience the Legacy
             Barbers difference.
           </p>
 
           <a
             href="/book"
-            className="inline-block mt-10 bg-yellow-400 text-black font-bold px-10 py-4 rounded-xl hover:bg-yellow-300 transition"
+            className="mt-10 inline-block rounded-xl bg-yellow-400 px-10 py-4 font-bold text-black transition hover:bg-yellow-300"
           >
             Book Appointment
           </a>
