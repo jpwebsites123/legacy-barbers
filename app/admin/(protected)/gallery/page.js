@@ -11,9 +11,8 @@ import {
   query,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import ImageUploader from "@/components/ImageUploader";
-
+import { db } from "../../../../lib/firebase";
+import ImageUploader from "../../../../components/ImageUploader";
 export default function AdminGalleryPage() {
   const [images, setImages] = useState([]);
   const [imageUrl, setImageUrl] = useState("");
