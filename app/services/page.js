@@ -9,72 +9,9 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { siteConfig } from "../../lib/siteConfig";
 
-const fallbackServices = [
-  {
-    id: "skin-fade",
-    name: "Skin Fade",
-    price: 35,
-    duration: "45 min",
-    description:
-      "A clean skin fade with precision blending and a styled finish.",
-    icon: "✂️",
-    active: true,
-    order: 1,
-  },
-  {
-    id: "haircut",
-    name: "Haircut",
-    price: 30,
-    duration: "40 min",
-    description:
-      "Classic or modern haircut tailored to your style and face shape.",
-    icon: "💈",
-    active: true,
-    order: 2,
-  },
-  {
-    id: "haircut-beard",
-    name: "Haircut & Beard",
-    price: 45,
-    duration: "60 min",
-    description: "Fresh haircut with a sharp beard trim and lineup.",
-    icon: "🧔",
-    active: true,
-    order: 3,
-  },
-  {
-    id: "beard-trim",
-    name: "Beard Trim",
-    price: 20,
-    duration: "20 min",
-    description: "Clean beard shaping, lineup, and finishing touches.",
-    icon: "🪒",
-    active: true,
-    order: 4,
-  },
-  {
-    id: "kids-haircut",
-    name: "Kids Haircut",
-    price: 25,
-    duration: "30 min",
-    description: "Professional haircut for children under 12.",
-    icon: "👦",
-    active: true,
-    order: 5,
-  },
-  {
-    id: "line-up",
-    name: "Line Up",
-    price: 15,
-    duration: "15 min",
-    description:
-      "Sharp edges and crisp hairline to keep your cut looking fresh.",
-    icon: "📏",
-    active: true,
-    order: 6,
-  },
-];
+const fallbackServices = siteConfig.services;
 
 function formatPrice(price) {
   const numberPrice = Number(price);
@@ -131,16 +68,15 @@ export default function Services() {
       {/* Hero */}
       <section className="px-4 pb-12 pt-28 text-center sm:px-6 sm:pb-16 sm:pt-32">
         <p className="font-semibold uppercase tracking-[0.25em] text-yellow-400 sm:tracking-[0.35em]">
-          Legacy Barbers
+          {siteConfig.businessName}
         </p>
 
         <h1 className="mt-5 text-4xl font-black sm:text-5xl md:text-6xl">
-          Our Services
+          {siteConfig.servicesPage.title}
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
-          Premium barber services designed to keep you looking sharp. Every
-          appointment includes attention to detail and a relaxing experience.
+          {siteConfig.servicesPage.description}
         </p>
 
         {servicesError && (
@@ -190,7 +126,7 @@ export default function Services() {
                     href="/book"
                     className="rounded-xl bg-yellow-400 px-5 py-2 font-bold text-black transition hover:bg-yellow-300"
                   >
-                    Book Now
+                    {siteConfig.servicesPage.bookButton}
                   </a>
                 </div>
               </div>
@@ -203,47 +139,34 @@ export default function Services() {
       <section className="border-t border-zinc-800 bg-zinc-950 px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-5xl text-center">
           <h2 className="text-3xl font-black sm:text-4xl">
-            Why Choose Legacy Barbers?
+            {siteConfig.servicesPage.whyChooseTitle}
           </h2>
 
           <p className="mx-auto mt-6 max-w-3xl text-base leading-relaxed text-zinc-400 sm:text-lg">
-            We combine modern barbering techniques with attention to detail,
-            creating clean cuts, sharp fades, and precise beard work in a
-            welcoming atmosphere. Every client leaves looking and feeling
-            confident.
+            {siteConfig.servicesPage.whyChooseDescription}
           </p>
 
           <div className="mt-12 grid gap-6 sm:grid-cols-3 sm:mt-14">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-              <div className="mb-3 text-4xl">⭐</div>
-              <h3 className="text-xl font-bold">Top Quality</h3>
-              <p className="mt-2 text-zinc-400">
-                Professional service using premium tools and products.
-              </p>
-            </div>
+            {siteConfig.servicesPage.benefits.map((benefit) => (
+  <div
+    key={benefit.id}
+    className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6"
+  >
+    <div className="mb-3 text-4xl">{benefit.icon}</div>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-              <div className="mb-3 text-4xl">💈</div>
-              <h3 className="text-xl font-bold">Experienced Barbers</h3>
-              <p className="mt-2 text-zinc-400">
-                Precision fades, modern styles, and classic cuts.
-              </p>
-            </div>
+    <h3 className="text-xl font-bold">{benefit.title}</h3>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-              <div className="mb-3 text-4xl">🕒</div>
-              <h3 className="text-xl font-bold">Always On Time</h3>
-              <p className="mt-2 text-zinc-400">
-                Book easily and get in the chair without long waits.
-              </p>
-            </div>
-          </div>
-
+    <p className="mt-2 text-zinc-400">
+      {benefit.description}
+    </p>
+  </div>
+))}
+</div>
           <a
             href="/book"
             className="mt-12 inline-block rounded-xl bg-yellow-400 px-8 py-4 text-lg font-bold text-black transition hover:bg-yellow-300 sm:mt-14 sm:px-10"
           >
-            Book Your Appointment
+            {siteConfig.servicesPage.bottomButton}
           </a>
         </div>
       </section>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { siteConfig } from "../lib/siteConfig";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -24,8 +25,8 @@ export default function Navbar() {
           className="z-10 transition-all duration-300 hover:scale-110 hover:rotate-2"
         >
           <Image
-            src="/logo.png"
-            alt="Legacy Barbers"
+  src={siteConfig.branding.logo}
+  alt={siteConfig.businessName}
             width={88}
             height={88}
             priority

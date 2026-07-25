@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { siteConfig } from "../lib/siteConfig";
 
 export default function Footer() {
   return (
@@ -11,8 +12,8 @@ export default function Footer() {
           className="transition-transform duration-300 hover:scale-110"
         >
           <Image
-            src="/logo.png"
-            alt="Legacy Barbers"
+            src={siteConfig.branding.logo}
+            alt={siteConfig.businessName}
             width={70}
             height={70}
             className="object-contain"
@@ -21,11 +22,11 @@ export default function Footer() {
 
         {/* Business Name */}
         <h2 className="mt-4 text-2xl font-black tracking-wide text-white">
-          LEGACY BARBERS
+          {siteConfig.businessName.toUpperCase()}
         </h2>
 
         <p className="mt-2 max-w-md text-sm text-gray-400">
-          Premium cuts. Professional service. Built for confidence.
+          {siteConfig.description}
         </p>
 
         {/* Navigation */}
@@ -56,7 +57,7 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="flex w-full flex-col items-center justify-between gap-3 text-center text-sm text-gray-500 md:flex-row">
-          <p>© 2026 Legacy Barbers. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {siteConfig.businessName}. All rights reserved.</p>
 
           <p>
             Designed & Built by{" "}

@@ -3,59 +3,17 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
+import { siteConfig } from "../../../../lib/siteConfig";
 
-const defaultBusinessHours = {
-  0: {
-    name: "Sunday",
-    closed: true,
-    open: "10:00",
-    close: "17:00",
-  },
-  1: {
-    name: "Monday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-  2: {
-    name: "Tuesday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-  3: {
-    name: "Wednesday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-  4: {
-    name: "Thursday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-  5: {
-    name: "Friday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-  6: {
-    name: "Saturday",
-    closed: false,
-    open: "10:00",
-    close: "17:00",
-  },
-};
-
+const defaultBusinessHours = siteConfig.defaultBusinessHours;
+  
 const defaultSettings = {
-  businessName: "Legacy Barbers",
-  bookingsOpen: true,
-  appointmentDuration: 60,
-  phone: "",
-  email: "",
-  address: "",
+  businessName: siteConfig.businessName,
+  bookingsOpen: siteConfig.booking.bookingsOpen,
+  appointmentDuration: siteConfig.booking.appointmentDuration,
+  phone: siteConfig.contact.phone,
+  email: siteConfig.contact.email,
+  address: siteConfig.contact.address,
   businessHours: defaultBusinessHours,
   closedDates: [],
 };
