@@ -4,24 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   where,
-  writeBatch,
 } from "firebase/firestore";
+import BookingCalendar from "./BookingCalendar";
 import { db } from "../lib/firebase";
 
-const times = [
-  "10:00 AM",
-  "11:00 AM",
-  "12:00 PM",
-  "1:00 PM",
-  "2:00 PM",
-  "3:00 PM",
-  "4:00 PM",
-  "5:00 PM",
-];
+const BUSINESS_TIME_ZONE = "America/Toronto";
+
+const defaultBusinessHours = {
+  0: { name: "Sunday", closed: true, open: "10:00", close: "17:00" },
+  1: { name: "Monday", closed: false, open: "10:00", close: "17:00" },
+  2: { name: "Tuesday", closed: false, open: "10:00", close: "17:00" },
+  3: { name: "Wednesday", closed: false, open: "10:00", close: "17:00" },
+  4: { name: "Thursday", closed: false, open: "10:00", close: "17:00" },
+  5: { name: "Friday", closed: false, open: "10:00", close: "17:00" },
+  6: { name: "Saturday", closed: false, open: "10:00", close: "17:00" },
+};
 
 const startingForm = {
   name: "",
@@ -31,21 +34,65 @@ const startingForm = {
   time: "",
 };
 
-function getTodayDate() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
+function getBusinessDateParts() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
 
-  return `${year}-${month}-${day}`;
+  const values = {};
+
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      values[part.type] = Number(part.value);
+    }
+  });
+
+  return {
+    year: values.year,
+    month: values.month,
+    day: values.day,
+  };
+}
+
+function createDateKey(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+    2,
+    "0"
+  )}`;
+}
+
+function getTodayDate() {
+  const { year, month, day } = getBusinessDateParts();
+  return createDateKey(year, month, day);
+}
+
+function isCurrentBookingMonth(dateString) {
+  if (!dateString) return false;
+
+  const { year, month } = getBusinessDateParts();
+  const [selectedYear, selectedMonth] = dateString.split("-").map(Number);
+
+  return selectedYear === year && selectedMonth === month;
+}
+
+function getNextMonthOpeningText() {
+  const { year, month } = getBusinessDateParts();
+  const nextMonthDate = new Date(year, month, 1);
+
+  return nextMonthDate.toLocaleDateString("en-CA", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function formatPhoneNumber(value) {
   const numbers = value.replace(/\D/g, "").slice(0, 10);
 
-  if (numbers.length <= 3) {
-    return numbers;
-  }
+  if (numbers.length <= 3) return numbers;
 
   if (numbers.length <= 6) {
     return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
@@ -63,27 +110,128 @@ function createSlotId(date, time) {
   return `${date}_${cleanedTime}`;
 }
 
+function timeToMinutes(time) {
+  if (!time) return 0;
+
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatTime(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const minuteValue = minutes % 60;
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHour = hours % 12 || 12;
+
+  return `${displayHour}:${String(minuteValue).padStart(2, "0")} ${period}`;
+}
+
+function generateTimeSlots(openTime, closeTime, duration) {
+  const openMinutes = timeToMinutes(openTime);
+  const closeMinutes = timeToMinutes(closeTime);
+  const appointmentDuration = Number(duration) || 60;
+
+  if (
+    !openTime ||
+    !closeTime ||
+    closeMinutes <= openMinutes ||
+    appointmentDuration <= 0
+  ) {
+    return [];
+  }
+
+  const slots = [];
+
+  for (
+    let currentMinutes = openMinutes;
+    currentMinutes + appointmentDuration <= closeMinutes;
+    currentMinutes += appointmentDuration
+  ) {
+    slots.push(formatTime(currentMinutes));
+  }
+
+  return slots;
+}
+
+function getDayOfWeek(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day).getDay();
+}
+
 export default function BookingForm() {
   const [form, setForm] = useState(startingForm);
   const [bookedTimes, setBookedTimes] = useState([]);
+  const [businessHours, setBusinessHours] = useState(defaultBusinessHours);
+  const [closedDates, setClosedDates] = useState([]);
+  const [appointmentDuration, setAppointmentDuration] = useState(60);
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+
+  useEffect(() => {
+    async function loadSchedule() {
+      try {
+        const settingsSnapshot = await getDoc(doc(db, "settings", "business"));
+
+        if (settingsSnapshot.exists()) {
+          const settingsData = settingsSnapshot.data();
+
+          setBusinessHours({
+            ...defaultBusinessHours,
+            ...(settingsData.businessHours || {}),
+          });
+
+          setClosedDates(
+            Array.isArray(settingsData.closedDates)
+              ? settingsData.closedDates
+              : []
+          );
+
+          setAppointmentDuration(
+            [30, 45, 60].includes(Number(settingsData.appointmentDuration))
+              ? Number(settingsData.appointmentDuration)
+              : 60
+          );
+        }
+      } catch (error) {
+        console.error("Error loading business schedule:", error);
+        setStatus("Could not load the latest business schedule.");
+        setStatusType("error");
+      } finally {
+        setIsLoadingSchedule(false);
+      }
+    }
+
+    loadSchedule();
+  }, []);
+
+  const dailyTimes = useMemo(() => {
+    if (!form.date || !isCurrentBookingMonth(form.date)) return [];
+
+    const schedule = businessHours[String(getDayOfWeek(form.date))];
+
+    if (!schedule || schedule.closed || closedDates.includes(form.date)) {
+      return [];
+    }
+
+    return generateTimeSlots(
+      schedule.open,
+      schedule.close,
+      appointmentDuration
+    );
+  }, [form.date, businessHours, closedDates, appointmentDuration]);
 
   const availableTimes = useMemo(() => {
-    return times.filter((time) => !bookedTimes.includes(time));
-  }, [bookedTimes]);
+    return dailyTimes.filter((time) => !bookedTimes.includes(time));
+  }, [dailyTimes, bookedTimes]);
 
   useEffect(() => {
     if (!form.date) {
       setBookedTimes([]);
-
-      setForm((currentForm) => ({
-        ...currentForm,
-        time: "",
-      }));
-
+      setForm((currentForm) => ({ ...currentForm, time: "" }));
       return;
     }
 
@@ -110,7 +258,7 @@ export default function BookingForm() {
 
         setBookedTimes(unavailableTimes);
 
-        const firstAvailableTime = times.find(
+        const firstAvailableTime = dailyTimes.find(
           (time) => !unavailableTimes.includes(time)
         );
 
@@ -124,17 +272,11 @@ export default function BookingForm() {
         if (!isActive) return;
 
         setBookedTimes([]);
-        setStatus("Could not load available times. Please refresh and try again.");
+        setStatus("Could not load available times. Please try again.");
         setStatusType("error");
-
-        setForm((currentForm) => ({
-          ...currentForm,
-          time: "",
-        }));
+        setForm((currentForm) => ({ ...currentForm, time: "" }));
       } finally {
-        if (isActive) {
-          setIsLoadingTimes(false);
-        }
+        if (isActive) setIsLoadingTimes(false);
       }
     }
 
@@ -143,7 +285,7 @@ export default function BookingForm() {
     return () => {
       isActive = false;
     };
-  }, [form.date]);
+  }, [form.date, dailyTimes]);
 
   function update(event) {
     const { name, value } = event.target;
@@ -154,6 +296,17 @@ export default function BookingForm() {
     setForm((currentForm) => ({
       ...currentForm,
       [name]: name === "phone" ? formatPhoneNumber(value) : value,
+    }));
+  }
+
+  function selectDate(date) {
+    setStatus("");
+    setStatusType("");
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      date,
+      time: "",
     }));
   }
 
@@ -184,20 +337,34 @@ export default function BookingForm() {
       return;
     }
 
+    if (!isCurrentBookingMonth(form.date)) {
+      setStatus("You can only book appointments in the current month.");
+      setStatusType("error");
+      return;
+    }
+
     if (form.date < today) {
       setStatus("You cannot book an appointment in the past.");
       setStatusType("error");
       return;
     }
 
-    if (!form.time) {
-      setStatus("There are no available times for this date.");
+    if (closedDates.includes(form.date)) {
+      setStatus("The barber is closed on this date.");
       setStatusType("error");
       return;
     }
 
-    if (!availableTimes.includes(form.time)) {
-      setStatus("That time is no longer available. Please choose another.");
+    const daySchedule = businessHours[String(getDayOfWeek(form.date))];
+
+    if (!daySchedule || daySchedule.closed) {
+      setStatus("The barber is closed on this day.");
+      setStatusType("error");
+      return;
+    }
+
+    if (!form.time || !availableTimes.includes(form.time)) {
+      setStatus("That time is no longer available. Choose another time.");
       setStatusType("error");
       return;
     }
@@ -208,33 +375,40 @@ export default function BookingForm() {
 
     try {
       const slotId = createSlotId(form.date, form.time);
-
       const bookingReference = doc(db, "bookings", slotId);
       const slotReference = doc(db, "bookedSlots", slotId);
 
-      const batch = writeBatch(db);
+      await runTransaction(db, async (transaction) => {
+        const existingSlot = await transaction.get(slotReference);
 
-      batch.set(bookingReference, {
-        name: trimmedName,
-        phone: formatPhoneNumber(phoneNumbers),
-        service: form.service,
-        date: form.date,
-        time: form.time,
-        status: "upcoming",
-        createdAt: serverTimestamp(),
+        if (existingSlot.exists()) {
+          throw new Error("slot-already-booked");
+        }
+
+        transaction.set(bookingReference, {
+          name: trimmedName,
+          phone: formatPhoneNumber(phoneNumbers),
+          service: form.service,
+          date: form.date,
+          time: form.time,
+          appointmentDuration,
+          status: "upcoming",
+          createdAt: serverTimestamp(),
+        });
+
+        transaction.set(slotReference, {
+          date: form.date,
+          time: form.time,
+          appointmentDuration,
+          createdAt: serverTimestamp(),
+        });
       });
-
-      batch.set(slotReference, {
-        date: form.date,
-        time: form.time,
-        createdAt: serverTimestamp(),
-      });
-
-      await batch.commit();
 
       setBookedTimes((currentTimes) => [
         ...new Set([...currentTimes, form.time]),
       ]);
+
+      setCalendarRefreshKey((currentKey) => currentKey + 1);
 
       setStatus("Appointment booked! We look forward to seeing you.");
       setStatusType("success");
@@ -242,9 +416,12 @@ export default function BookingForm() {
     } catch (error) {
       console.error("Booking error:", error);
 
-      if (error.code === "permission-denied") {
+      if (
+        error.message === "slot-already-booked" ||
+        error.code === "permission-denied"
+      ) {
         setStatus(
-          "That time may have just been booked. Choose another time and try again."
+          "That appointment was just booked by someone else. Choose another time."
         );
       } else {
         setStatus("Something went wrong. Please try again.");
@@ -257,17 +434,25 @@ export default function BookingForm() {
   }
 
   const fieldClasses =
-    "block w-full min-w-0 max-w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base text-white outline-none transition focus:border-yellow-400 disabled:cursor-not-allowed disabled:opacity-50";
+    "block w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base text-white outline-none transition focus:border-yellow-400 disabled:cursor-not-allowed disabled:opacity-50";
 
-  const formDisabled = isSubmitting;
+  const formDisabled = isSubmitting || isLoadingSchedule;
 
   return (
-    <div className="w-full min-w-0 max-w-full">
-      <form
-        onSubmit={book}
-        className="grid w-full min-w-0 max-w-full grid-cols-1 gap-4"
-      >
-        <label className="grid min-w-0 gap-2">
+    <div className="w-full">
+      <div className="mb-6 rounded-2xl border border-yellow-400/30 bg-yellow-400/10 p-4">
+        <p className="font-bold text-yellow-400">
+          Next month opens automatically
+        </p>
+
+        <p className="mt-1 text-sm text-zinc-300">
+          Bookings for the next month open on {getNextMonthOpeningText()} at
+          12:00 AM.
+        </p>
+      </div>
+
+      <form onSubmit={book} className="grid w-full grid-cols-1 gap-5">
+        <label className="grid gap-2">
           <span className="text-sm font-semibold sm:text-base">Name</span>
 
           <input
@@ -285,7 +470,7 @@ export default function BookingForm() {
           />
         </label>
 
-        <label className="grid min-w-0 gap-2">
+        <label className="grid gap-2">
           <span className="text-sm font-semibold sm:text-base">
             Phone number
           </span>
@@ -305,7 +490,7 @@ export default function BookingForm() {
           />
         </label>
 
-        <label className="grid min-w-0 gap-2">
+        <label className="grid gap-2">
           <span className="text-sm font-semibold sm:text-base">Service</span>
 
           <select
@@ -322,22 +507,41 @@ export default function BookingForm() {
           </select>
         </label>
 
-        <label className="grid min-w-0 gap-2">
-          <span className="text-sm font-semibold sm:text-base">Date</span>
+        <div className="grid gap-2">
+          <span className="text-sm font-semibold sm:text-base">
+            Choose a date
+          </span>
 
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={update}
-            required
-            min={getTodayDate()}
-            disabled={formDisabled}
-            className={fieldClasses}
-          />
-        </label>
+          {isLoadingSchedule ? (
+            <div className="flex min-h-72 items-center justify-center rounded-2xl border border-zinc-700 bg-black">
+              <p className="text-zinc-400">Loading schedule...</p>
+            </div>
+          ) : (
+            <BookingCalendar
+              selectedDate={form.date}
+              onSelectDate={selectDate}
+              businessHours={businessHours}
+              closedDates={closedDates}
+              appointmentDuration={appointmentDuration}
+              disabled={formDisabled}
+              refreshKey={calendarRefreshKey}
+            />
+          )}
 
-        <label className="grid min-w-0 gap-2">
+          {form.date && (
+            <p className="text-sm font-semibold text-yellow-400">
+              Selected date:{" "}
+              {new Date(`${form.date}T00:00:00`).toLocaleDateString("en-CA", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
+          )}
+        </div>
+
+        <label className="grid gap-2">
           <span className="text-sm font-semibold sm:text-base">Time</span>
 
           <select
@@ -374,11 +578,15 @@ export default function BookingForm() {
               ))}
           </select>
 
+          <span className="text-xs text-zinc-500">
+            Appointments are {appointmentDuration} minutes long.
+          </span>
+
           {form.date &&
             !isLoadingTimes &&
             availableTimes.length === 0 && (
               <span className="text-sm font-semibold text-red-400">
-                This date is fully booked. Please choose another date.
+                This date is fully booked or closed.
               </span>
             )}
         </label>
@@ -391,7 +599,7 @@ export default function BookingForm() {
             !form.date ||
             availableTimes.length === 0
           }
-          className="mt-1 w-full max-w-full rounded-xl bg-yellow-400 px-4 py-4 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-1 w-full rounded-xl bg-yellow-400 px-4 py-4 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? "Booking..." : "Book Now"}
         </button>
@@ -400,7 +608,7 @@ export default function BookingForm() {
       {status && (
         <p
           aria-live="polite"
-          className={`mt-5 max-w-full break-words text-sm font-semibold sm:text-base ${
+          className={`mt-5 break-words text-sm font-semibold sm:text-base ${
             statusType === "success"
               ? "text-green-400"
               : statusType === "error"
