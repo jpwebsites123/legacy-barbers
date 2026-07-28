@@ -5,22 +5,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
-  BarChart3,
   CalendarDays,
-  Clock3,
   Image as ImageIcon,
   LayoutDashboard,
+  LoaderCircle,
   LogOut,
   Menu,
   Scissors,
   Settings,
-  Star,
-  Umbrella,
   X,
 } from "lucide-react";
 import { auth } from "../../../lib/firebase";
 
-const mainLinks = [
+const navigationLinks = [
   {
     name: "Dashboard",
     href: "/admin",
@@ -48,24 +45,56 @@ const mainLinks = [
   },
 ];
 
-const comingSoonLinks = [
-  {
-    name: "Business Hours",
-    icon: Clock3,
-  },
-  {
-    name: "Vacation Days",
-    icon: Umbrella,
-  },
-  {
-    name: "Reviews",
-    icon: Star,
-  },
-  {
-    name: "Analytics",
-    icon: BarChart3,
-  },
-];
+function LoadingScreen() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-black px-4 text-white">
+      <div className="text-center">
+        <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 rounded-2xl bg-yellow-400/15 blur-xl" />
+
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-yellow-400/30 bg-zinc-950 text-yellow-400">
+            <LoaderCircle size={26} className="animate-spin" />
+          </div>
+        </div>
+
+        <p className="mt-5 font-bold text-white">
+          Checking admin access
+        </p>
+
+        <p className="mt-2 text-sm text-zinc-500">
+          Please wait a moment...
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function BrandLogo({ compact = false }) {
+  return (
+    <Link
+      href="/admin"
+      className="group flex min-w-0 items-center gap-3"
+    >
+      <div
+        className={`relative flex shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black shadow-[0_10px_30px_rgba(250,204,21,0.15)] transition duration-300 group-hover:scale-105 group-hover:shadow-[0_12px_35px_rgba(250,204,21,0.25)] ${
+          compact ? "h-10 w-10" : "h-11 w-11"
+        }`}
+      >
+        <Scissors size={compact ? 21 : 23} />
+      </div>
+
+      <div className="min-w-0">
+        <p className="truncate font-black leading-none text-white">
+          Legacy Barbers
+        </p>
+
+        <p className="mt-1.5 text-xs font-medium text-zinc-500">
+          Admin Panel
+        </p>
+      </div>
+    </Link>
+  );
+}
 
 export default function ProtectedAdminLayout({ children }) {
   const router = useRouter();
@@ -77,17 +106,20 @@ export default function ProtectedAdminLayout({ children }) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        setUser(null);
-        setCheckingAuth(false);
-        router.replace("/admin/login");
-        return;
-      }
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        if (!currentUser) {
+          setUser(null);
+          setCheckingAuth(false);
+          router.replace("/admin/login");
+          return;
+        }
 
-      setUser(currentUser);
-      setCheckingAuth(false);
-    });
+        setUser(currentUser);
+        setCheckingAuth(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [router]);
@@ -96,8 +128,38 @@ export default function ProtectedAdminLayout({ children }) {
     setSidebarOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!sidebarOpen) {
+      return undefined;
+    }
+
+    function closeSidebarWithEscape(event) {
+      if (event.key === "Escape") {
+        setSidebarOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "keydown",
+      closeSidebarWithEscape
+    );
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        closeSidebarWithEscape
+      );
+
+      document.body.style.overflow = "";
+    };
+  }, [sidebarOpen]);
+
   async function handleLogout() {
-    if (loggingOut) return;
+    if (loggingOut) {
+      return;
+    }
 
     setLoggingOut(true);
 
@@ -118,93 +180,89 @@ export default function ProtectedAdminLayout({ children }) {
     return pathname.startsWith(href);
   }
 
-  if (checkingAuth) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-black px-4 text-white">
-        <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-yellow-400" />
+  function getUserInitial() {
+    if (!user?.email) {
+      return "A";
+    }
 
-          <p className="mt-4 text-zinc-400">Checking admin access...</p>
-        </div>
-      </main>
-    );
+    return user.email.charAt(0).toUpperCase();
+  }
+
+  if (checkingAuth) {
+    return <LoadingScreen />;
   }
 
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black px-4 text-white">
-        <p className="text-zinc-400">Redirecting to login...</p>
+        <div className="text-center">
+          <LoaderCircle
+            size={28}
+            className="mx-auto animate-spin text-yellow-400"
+          />
+
+          <p className="mt-4 text-zinc-400">
+            Redirecting to login...
+          </p>
+        </div>
       </main>
     );
   }
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 lg:hidden">
-        <Link href="/admin" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400 text-black">
-            <Scissors size={21} />
-          </div>
-
-          <div>
-            <p className="font-black leading-none">Legacy Barbers</p>
-            <p className="mt-1 text-xs text-zinc-500">Admin Panel</p>
-          </div>
-        </Link>
+      <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-zinc-800/80 bg-zinc-950/95 px-4 shadow-lg shadow-black/20 backdrop-blur-xl lg:hidden">
+        <BrandLogo compact />
 
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
           aria-label="Open navigation"
-          className="rounded-xl border border-zinc-700 p-2.5 transition hover:border-yellow-400 hover:text-yellow-400"
+          aria-expanded={sidebarOpen}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-black text-zinc-300 transition duration-200 hover:border-yellow-400 hover:text-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/20"
         >
-          <Menu size={22} />
+          <Menu size={21} />
         </button>
       </header>
 
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
-        />
-      )}
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => setSidebarOpen(false)}
+        className={`fixed inset-0 z-40 bg-black/75 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          sidebarOpen
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0"
+        }`}
+      />
 
       <aside
-        className={`fixed bottom-0 left-0 top-0 z-50 flex w-72 flex-col border-r border-zinc-800 bg-zinc-950 transition-transform duration-300 lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed bottom-0 left-0 top-0 z-50 flex w-72 flex-col border-r border-zinc-800/80 bg-zinc-950 shadow-2xl shadow-black transition-transform duration-300 ease-out lg:translate-x-0 ${
+          sidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full"
         }`}
       >
-        <div className="flex h-20 items-center justify-between border-b border-zinc-800 px-5">
-          <Link href="/admin" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-400 text-black">
-              <Scissors size={23} />
-            </div>
-
-            <div>
-              <p className="font-black">Legacy Barbers</p>
-              <p className="mt-1 text-xs text-zinc-500">Admin Panel</p>
-            </div>
-          </Link>
+        <div className="flex h-20 items-center justify-between border-b border-zinc-800/80 px-5">
+          <BrandLogo />
 
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close navigation"
-            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white lg:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-zinc-900 hover:text-white lg:hidden"
           >
-            <X size={21} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5">
-          <p className="mb-3 px-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-600">
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <p className="mb-3 px-3 text-[11px] font-black uppercase tracking-[0.22em] text-zinc-600">
             Management
           </p>
 
-          <nav className="space-y-2">
-            {mainLinks.map((link) => {
+          <nav className="space-y-1.5">
+            {navigationLinks.map((link) => {
               const Icon = link.icon;
               const active = isActiveLink(link.href);
 
@@ -212,63 +270,65 @@ export default function ProtectedAdminLayout({ children }) {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-3 font-semibold transition ${
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex items-center gap-3 overflow-hidden rounded-xl px-4 py-3.5 font-bold transition duration-200 ${
                     active
-                      ? "bg-yellow-400 text-black"
+                      ? "bg-yellow-400 text-black shadow-[0_10px_30px_rgba(250,204,21,0.12)]"
                       : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
                   }`}
                 >
-                  <Icon size={20} />
-                  {link.name}
+                  {!active && (
+                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-yellow-400 opacity-0 transition group-hover:opacity-100" />
+                  )}
+
+                  <Icon
+                    size={20}
+                    className={`shrink-0 transition duration-200 ${
+                      active
+                        ? "text-black"
+                        : "text-zinc-500 group-hover:text-yellow-400"
+                    }`}
+                  />
+
+                  <span>{link.name}</span>
                 </Link>
               );
             })}
           </nav>
-
-          <div className="my-6 border-t border-zinc-800" />
-
-          <p className="mb-3 px-3 text-xs font-bold uppercase tracking-[0.2em] text-zinc-600">
-            Coming Soon
-          </p>
-
-          <div className="space-y-2">
-            {comingSoonLinks.map((link) => {
-              const Icon = link.icon;
-
-              return (
-                <div
-                  key={link.name}
-                  className="flex cursor-not-allowed items-center justify-between rounded-xl px-4 py-3 text-zinc-600"
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon size={20} />
-                    <span className="font-semibold">{link.name}</span>
-                  </div>
-
-                  <span className="rounded-full bg-zinc-900 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                    Soon
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
-        <div className="border-t border-zinc-800 p-4">
-          <div className="mb-3 rounded-xl bg-black p-3">
-            <p className="text-xs text-zinc-500">Signed in as</p>
-            <p className="mt-1 truncate text-sm font-semibold text-zinc-300">
-              {user.email}
-            </p>
+        <div className="border-t border-zinc-800/80 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-zinc-800 bg-black/60 p-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 font-black text-yellow-400">
+              {getUserInitial()}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-600">
+                Administrator
+              </p>
+
+              <p className="mt-1 truncate text-sm font-semibold text-zinc-300">
+                {user.email}
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 px-4 py-3 font-bold transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3.5 font-bold text-zinc-300 transition duration-200 hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <LogOut size={19} />
+            {loggingOut ? (
+              <LoaderCircle
+                size={19}
+                className="animate-spin"
+              />
+            ) : (
+              <LogOut size={19} />
+            )}
+
             {loggingOut ? "Logging Out..." : "Log Out"}
           </button>
         </div>

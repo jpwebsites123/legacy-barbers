@@ -27,26 +27,28 @@ export default function Contact() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
       {/* Hero */}
-      <section className="px-4 pb-10 pt-28 text-center sm:px-6 sm:pb-14 sm:pt-32">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-yellow-400 sm:text-sm sm:tracking-[0.35em]">
-          {siteConfig.businessName}
-        </p>
+      <section className="section-spacing text-center">
+        <div className="section-container">
+          <p className="fade-up text-xs font-semibold uppercase tracking-[0.22em] text-yellow-400 sm:text-sm sm:tracking-[0.35em]">
+            {siteConfig.businessName}
+          </p>
 
-        <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-black leading-tight sm:mt-5 sm:text-5xl md:text-6xl">
-          {siteConfig.contactPage.title}
-        </h1>
+          <h1 className="section-title fade-up-delay-1 mx-auto mt-5 max-w-3xl">
+            {siteConfig.contactPage.title}
+          </h1>
 
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:mt-6 sm:text-lg">
-          {siteConfig.contactPage.description}
-        </p>
+          <p className="section-description fade-up-delay-2 mx-auto">
+            {siteConfig.contactPage.description}
+          </p>
+        </div>
       </section>
 
       {/* Contact Section */}
       <section className="px-4 pb-20 sm:px-6 sm:pb-24">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="section-container grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           {/* Contact Information */}
           <div className="w-full min-w-0 space-y-5 sm:space-y-6">
-            <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:rounded-3xl sm:p-7">
+            <div className="premium-card fade-up w-full min-w-0 max-w-full overflow-hidden p-5 sm:p-7">
               <h2 className="text-2xl font-black sm:text-3xl">
                 Get in Touch
               </h2>
@@ -123,18 +125,17 @@ export default function Contact() {
             </div>
 
             {/* Business Hours */}
-            <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:rounded-3xl sm:p-7">
+            <div className="premium-card fade-up w-full min-w-0 max-w-full overflow-hidden p-5 sm:p-7">
               <h2 className="text-2xl font-bold">Business Hours</h2>
 
               <div className="mt-6 space-y-4 text-sm text-zinc-300 sm:text-base">
                 {businessHours.map((day, index) => (
                   <div
                     key={day.name}
-                    className={`flex min-w-0 items-start justify-between gap-4 ${
-                      index < businessHours.length - 1
+                    className={`flex min-w-0 items-start justify-between gap-4 ${index < businessHours.length - 1
                         ? "border-b border-zinc-800 pb-3"
                         : ""
-                    }`}
+                      }`}
                   >
                     <span className="min-w-0">{day.name}</span>
 
@@ -142,8 +143,8 @@ export default function Contact() {
                       {day.closed
                         ? "Closed"
                         : `${formatTime(day.open)} – ${formatTime(
-                            day.close
-                          )}`}
+                          day.close
+                        )}`}
                     </span>
                   </div>
                 ))}
@@ -152,7 +153,7 @@ export default function Contact() {
           </div>
 
           {/* Contact Form */}
-          <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-4 sm:rounded-3xl sm:p-8">
+          <div className="premium-card fade-up w-full min-w-0 max-w-full overflow-hidden p-5 sm:p-8">
             <h2 className="break-words text-2xl font-black sm:text-3xl">
               Send a Message
             </h2>
@@ -176,7 +177,7 @@ export default function Contact() {
                   name="name"
                   autoComplete="name"
                   placeholder="Your name"
-                  className="block w-full min-w-0 max-w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base outline-none transition focus:border-yellow-400 sm:p-4"
+                  className="premium-input block w-full min-w-0 max-w-full px-4 py-3 text-base sm:py-4"
                   required
                 />
               </label>
@@ -191,7 +192,7 @@ export default function Contact() {
                   name="email"
                   autoComplete="email"
                   placeholder="Your email"
-                  className="block w-full min-w-0 max-w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base outline-none transition focus:border-yellow-400 sm:p-4"
+                  className="premium-input block w-full min-w-0 max-w-full px-4 py-3 text-base sm:py-4"
                   required
                 />
               </label>
@@ -206,7 +207,7 @@ export default function Contact() {
                   name="phone"
                   autoComplete="tel"
                   placeholder="Your phone number"
-                  className="block w-full min-w-0 max-w-full rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base outline-none transition focus:border-yellow-400 sm:p-4"
+                  className="premium-input block w-full min-w-0 max-w-full px-4 py-3 text-base sm:py-4"
                 />
               </label>
 
@@ -219,14 +220,14 @@ export default function Contact() {
                   name="message"
                   rows={6}
                   placeholder="How can we help?"
-                  className="block w-full min-w-0 max-w-full resize-none rounded-xl border border-zinc-700 bg-black px-3 py-3 text-base outline-none transition focus:border-yellow-400 sm:p-4"
+                  className="premium-input block w-full min-w-0 max-w-full resize-none px-4 py-3 text-base sm:py-4"
                   required
                 />
               </label>
 
               <button
                 type="submit"
-                className="w-full max-w-full rounded-xl bg-yellow-400 px-4 py-4 font-bold text-black transition hover:bg-yellow-300"
+                className="premium-button w-full max-w-full py-4"
               >
                 Send Message
               </button>
@@ -235,23 +236,30 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="border-t border-zinc-800 bg-zinc-950 px-4 py-14 sm:px-6 sm:py-16">
-        <div className="mx-auto w-full max-w-4xl text-center">
-          <h2 className="break-words text-3xl font-black md:text-4xl">
-            {siteConfig.cta.title}
-          </h2>
+      <section className="relative overflow-hidden border-t border-zinc-800 bg-zinc-950">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-yellow-400/5 to-transparent" />
 
-          <p className="mt-4 break-words text-base text-zinc-400 sm:mt-5 sm:text-lg">
-            {siteConfig.cta.description}
-          </p>
+        <div className="section-spacing relative">
+          <div className="mx-auto w-full max-w-4xl text-center">
+            <p className="font-semibold uppercase tracking-[0.3em] text-yellow-400">
+              Ready For A Fresh Look?
+            </p>
 
-          <Link
-            href="/book"
-            className="mt-7 inline-block max-w-full rounded-xl bg-yellow-400 px-7 py-4 font-bold text-black transition hover:bg-yellow-300 sm:mt-8 sm:px-10"
-          >
-            {siteConfig.cta.button}
-          </Link>
+            <h2 className="section-title mt-5">
+              {siteConfig.cta.title}
+            </h2>
+
+            <p className="section-description mx-auto max-w-2xl">
+              {siteConfig.cta.description}
+            </p>
+
+            <Link
+              href="/book"
+              className="premium-button mt-8 sm:mt-10"
+            >
+              {siteConfig.cta.button}
+            </Link>
+          </div>
         </div>
       </section>
     </main>

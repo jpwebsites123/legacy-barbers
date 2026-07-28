@@ -1,19 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
+
 import BookingForm from "../../components/BookingForm";
 import { db } from "../../lib/firebase";
+import { siteConfig } from "../../lib/siteConfig";
 
 const defaultSettings = {
-  bookingMonth: "July 2026",
-  bookingsOpen: true,
-  bookingOpenDate: "",
-  bookingOpenTime: "10:00",
+  bookingMonth: siteConfig.booking?.bookingMonth || "July 2026",
+  bookingsOpen: siteConfig.booking?.bookingsOpen ?? true,
+  bookingOpenDate: siteConfig.booking?.bookingOpenDate || "",
+  bookingOpenTime: siteConfig.booking?.bookingOpenTime || "10:00",
 };
 
 function formatTime(time) {
-  if (!time) return "10:00 AM";
+  if (!time) {
+    return "10:00 AM";
+  }
 
   const [hours, minutes] = time.split(":");
   const hourNumber = Number(hours);
@@ -29,7 +34,9 @@ function formatTime(time) {
 }
 
 function formatDate(date) {
-  if (!date) return "";
+  if (!date) {
+    return "";
+  }
 
   const parsedDate = new Date(`${date}T00:00:00`);
 
@@ -44,10 +51,12 @@ function formatDate(date) {
   });
 }
 
-export default function Book() {
+export default function BookPage() {
   const [settings, setSettings] = useState(defaultSettings);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [settingsError, setSettingsError] = useState("");
+
+  const bookingPage = siteConfig.bookingPage;
 
   useEffect(() => {
     async function loadSettings() {
@@ -63,6 +72,7 @@ export default function Book() {
         }
       } catch (error) {
         console.error("Error loading booking settings:", error);
+
         setSettingsError(
           "We could not load the latest booking information."
         );
@@ -87,37 +97,37 @@ export default function Book() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-black text-white">
       {/* Hero */}
-      <section className="px-4 pb-10 pt-28 text-center sm:px-6 sm:pb-14 sm:pt-32">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-yellow-400 sm:text-sm sm:tracking-[0.35em]">
-          Legacy Barbers
-        </p>
+      <section className="section-spacing text-center">
+        <div className="section-container">
+          <p className="fade-up text-xs font-semibold uppercase tracking-[0.22em] text-yellow-400 sm:text-sm sm:tracking-[0.35em]">
+            {siteConfig.businessName}
+          </p>
 
-        <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-black leading-tight sm:mt-5 sm:text-5xl md:text-6xl">
-          Book Your Appointment
-        </h1>
+          <h1 className="section-title fade-up-delay-1 mx-auto mt-5 max-w-3xl">
+            {bookingPage.title}
+          </h1>
 
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:mt-6 sm:text-lg">
-          Choose your service, date, and preferred time. Bookings open on the
-          first day of each month and stay open until all appointments are
-          filled.
-        </p>
+          <p className="section-description fade-up-delay-2 mx-auto">
+            {bookingPage.description}
+          </p>
+        </div>
       </section>
 
       {/* Booking Content */}
       <section className="px-4 pb-20 sm:px-6 sm:pb-24">
-        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 lg:grid-cols-[1fr_1.7fr] lg:gap-8">
+        <div className="section-container grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.7fr] lg:gap-8">
           {/* Left Column */}
           <div className="w-full min-w-0 space-y-5 sm:space-y-6">
-            {/* Current Month */}
-            <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:rounded-3xl sm:p-7">
+            {/* Current Booking Month */}
+            <div className="premium-card fade-up w-full p-5 sm:p-7">
               <p className="text-xs uppercase tracking-[0.18em] text-zinc-500 sm:text-sm sm:tracking-[0.25em]">
-                Current Booking Month
+                {bookingPage.currentMonthLabel}
               </p>
 
               {loadingSettings ? (
                 <div className="mt-4">
-                  <div className="h-9 w-40 animate-pulse rounded-lg bg-zinc-800" />
-                  <div className="mt-5 h-5 w-36 animate-pulse rounded-lg bg-zinc-800" />
+                  <div className="loading-skeleton h-9 w-40 rounded-lg" />
+                  <div className="loading-skeleton mt-5 h-5 w-36 rounded-lg" />
                 </div>
               ) : (
                 <>
@@ -127,15 +137,13 @@ export default function Book() {
 
                   <div className="mt-4 flex items-center gap-3 sm:mt-5">
                     <span
-                      className={`h-3 w-3 shrink-0 rounded-full ${
-                        bookingsOpen ? "bg-green-500" : "bg-red-500"
-                      }`}
+                      className={`glow h-3 w-3 shrink-0 rounded-full ${bookingsOpen ? "bg-green-500" : "bg-red-500"
+                        }`}
                     />
 
                     <p
-                      className={`text-sm font-bold sm:text-base ${
-                        bookingsOpen ? "text-green-400" : "text-red-400"
-                      }`}
+                      className={`text-sm font-bold sm:text-base ${bookingsOpen ? "text-green-400" : "text-red-400"
+                        }`}
                     >
                       {bookingsOpen
                         ? "Bookings Are Open"
@@ -153,39 +161,28 @@ export default function Book() {
             </div>
 
             {/* Before You Book */}
-            <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:rounded-3xl sm:p-7">
-              <h2 className="text-2xl font-bold">Before You Book</h2>
+            <div className="w-full premium-card fade-up p-5  sm:p-7">
+              <h2 className="text-2xl font-bold">
+                {bookingPage.beforeBookingTitle}
+              </h2>
 
               <div className="mt-6 space-y-5">
-                {[
-                  [
-                    "01",
-                    "Arrive On Time",
-                    "Please arrive a few minutes before your appointment.",
-                  ],
-                  [
-                    "02",
-                    "Choose Carefully",
-                    "Select the correct service so enough time is reserved.",
-                  ],
-                  [
-                    "03",
-                    "Need Help?",
-                    "Contact us before booking if you have questions.",
-                  ],
-                ].map(([number, title, text]) => (
-                  <div key={number} className="flex min-w-0 gap-3 sm:gap-4">
+                {bookingPage.tips.map((tip) => (
+                  <div
+                    key={tip.number}
+                    className="fade-up flex min-w-0 gap-3 sm:gap-4"
+                  >
                     <span className="shrink-0 text-lg font-bold text-yellow-400 sm:text-xl">
-                      {number}
+                      {tip.number}
                     </span>
 
                     <div className="min-w-0">
                       <h3 className="text-base font-bold sm:text-lg">
-                        {title}
+                        {tip.title}
                       </h3>
 
                       <p className="mt-1 break-words text-sm leading-relaxed text-zinc-400 sm:text-base">
-                        {text}
+                        {tip.description}
                       </p>
                     </div>
                   </div>
@@ -195,7 +192,7 @@ export default function Book() {
           </div>
 
           {/* Right Column */}
-          <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-4 shadow-2xl sm:rounded-3xl sm:p-8">
+          <div className="w-full min-w-0 max-w-full overflow-hidden premium-card fade-up p-4 shadow-2xl sm:p-8">
             {loadingSettings ? (
               <div className="flex min-h-[420px] items-center justify-center">
                 <div className="text-center">
@@ -210,11 +207,11 @@ export default function Book() {
               <>
                 <div className="mb-6 min-w-0 sm:mb-8">
                   <h2 className="break-words text-2xl font-black sm:text-3xl">
-                    Select Your Appointment
+                    {bookingPage.bookingFormTitle}
                   </h2>
 
                   <p className="mt-3 break-words text-sm leading-relaxed text-zinc-400 sm:text-base">
-                    Complete the form below to reserve your spot for{" "}
+                    {bookingPage.bookingFormDescription}{" "}
                     <span className="font-semibold text-white">
                       {bookingMonth}
                     </span>
@@ -231,11 +228,11 @@ export default function Book() {
                 </div>
 
                 <h2 className="mt-6 text-3xl font-black text-red-400 sm:mt-7 sm:text-4xl">
-                  Bookings Closed
+                  {bookingPage.closedTitle}
                 </h2>
 
                 <p className="mx-auto mt-4 max-w-xl break-words text-sm text-zinc-400 sm:mt-5 sm:text-base">
-                  Appointments for {bookingMonth} are not currently available.
+                  {bookingPage.closedDescription}
                 </p>
 
                 {(formattedOpenDate || formattedOpenTime) && (
@@ -246,12 +243,12 @@ export default function Book() {
                   </p>
                 )}
 
-                <a
+                <Link
                   href="/contact"
-                  className="mt-8 inline-block rounded-xl bg-yellow-400 px-7 py-3 font-bold text-black transition hover:bg-yellow-300 sm:mt-9 sm:px-8 sm:py-4"
+                  className="premium-button mt-8 sm:mt-9 sm:px-8 sm:py-4"
                 >
-                  Contact Us
-                </a>
+                  {bookingPage.contactButton}
+                </Link>
               </div>
             )}
           </div>
@@ -259,22 +256,30 @@ export default function Book() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="border-t border-zinc-800 bg-zinc-950 px-4 py-14 sm:px-6 sm:py-16">
-        <div className="mx-auto w-full max-w-4xl text-center">
-          <h2 className="break-words text-3xl font-black md:text-4xl">
-            Questions Before Booking?
-          </h2>
+      <section className="relative overflow-hidden border-t border-zinc-800 bg-zinc-950">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-yellow-400/5 to-transparent" />
 
-          <p className="mt-4 break-words text-base text-zinc-400 sm:mt-5 sm:text-lg">
-            Contact us and we will help you choose the right service.
-          </p>
+        <div className="section-spacing relative">
+          <div className="mx-auto max-w-4xl text-center">
+            <p className="font-semibold uppercase tracking-[0.3em] text-yellow-400">
+              Need Help Booking?
+            </p>
 
-          <a
-            href="/contact"
-            className="mt-7 inline-block max-w-full rounded-xl border border-yellow-400 px-6 py-3 font-bold text-yellow-400 transition hover:bg-yellow-400 hover:text-black sm:mt-8 sm:px-8"
-          >
-            Contact Legacy Barbers
-          </a>
+            <h2 className="section-title mt-5">
+              {bookingPage.bottomTitle}
+            </h2>
+
+            <p className="section-description mx-auto max-w-2xl">
+              {bookingPage.bottomDescription}
+            </p>
+
+            <Link
+              href="/contact"
+              className="premium-outline-button mt-8 sm:mt-10"
+            >
+              {bookingPage.bottomButton}
+            </Link>
+          </div>
         </div>
       </section>
     </main>
