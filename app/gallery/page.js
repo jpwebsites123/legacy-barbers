@@ -23,8 +23,8 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { db } from "../../../../lib/firebase";
-import ImageUploader from "../../../../components/ImageUploader";
+import { db } from "../../lib/firebase";
+import ImageUploader from "../../components/ImageUploader";
 
 function GallerySkeleton() {
   return (
