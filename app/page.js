@@ -46,7 +46,7 @@ export default function Home() {
                   className={`premium-card fade-up-delay-${Math.min(
                     index + 1,
                     3
-                  )} flex items-center gap-4 bg-zinc-900/90 p-5 backdrop-blur-sm`}
+                  )} flex items-center gap-4 rounded-2xl border border-white/10 bg-black/35 p-5 backdrop-blur-xl transition duration-300 hover:bg-black/45 hover:border-yellow-400/30`}
                 >
                   <div className="text-3xl">
                     {feature.icon}
@@ -57,7 +57,7 @@ export default function Home() {
                       {feature.title}
                     </h2>
 
-                    <p className="mt-1 text-sm text-zinc-400">
+                    <p className="mt-1 text-sm text-zinc-300">
                       {feature.text}
                     </p>
                   </div>
