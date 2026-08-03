@@ -11,19 +11,55 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
+
 import BookingCalendar from "./BookingCalendar";
 import { db } from "../lib/firebase";
 
 const BUSINESS_TIME_ZONE = "America/Toronto";
 
 const defaultBusinessHours = {
-  0: { name: "Sunday", closed: true, open: "10:00", close: "17:00" },
-  1: { name: "Monday", closed: false, open: "10:00", close: "17:00" },
-  2: { name: "Tuesday", closed: false, open: "10:00", close: "17:00" },
-  3: { name: "Wednesday", closed: false, open: "10:00", close: "17:00" },
-  4: { name: "Thursday", closed: false, open: "10:00", close: "17:00" },
-  5: { name: "Friday", closed: false, open: "10:00", close: "17:00" },
-  6: { name: "Saturday", closed: false, open: "10:00", close: "17:00" },
+  0: {
+    name: "Sunday",
+    closed: true,
+    open: "10:00",
+    close: "17:00",
+  },
+  1: {
+    name: "Monday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
+  2: {
+    name: "Tuesday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
+  3: {
+    name: "Wednesday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
+  4: {
+    name: "Thursday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
+  5: {
+    name: "Friday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
+  6: {
+    name: "Saturday",
+    closed: false,
+    open: "10:00",
+    close: "17:00",
+  },
 };
 
 const startingForm = {
@@ -44,11 +80,11 @@ function getBusinessDateParts() {
 
   const values = {};
 
-  parts.forEach((part) => {
+  for (const part of parts) {
     if (part.type !== "literal") {
       values[part.type] = Number(part.value);
     }
-  });
+  }
 
   return {
     year: values.year,
@@ -66,11 +102,14 @@ function createDateKey(year, month, day) {
 
 function getTodayDate() {
   const { year, month, day } = getBusinessDateParts();
+
   return createDateKey(year, month, day);
 }
 
 function isCurrentBookingMonth(dateString) {
-  if (!dateString) return false;
+  if (!dateString) {
+    return false;
+  }
 
   const { year, month } = getBusinessDateParts();
   const [selectedYear, selectedMonth] = dateString.split("-").map(Number);
@@ -80,29 +119,47 @@ function isCurrentBookingMonth(dateString) {
 
 function getNextMonthOpeningText() {
   const { year, month } = getBusinessDateParts();
-  const nextMonthDate = new Date(year, month, 1);
+
+  let nextMonth = month + 1;
+  let nextYear = year;
+
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    nextYear += 1;
+  }
+
+  const nextMonthDate = new Date(
+    `${nextYear}-${String(nextMonth).padStart(2, "0")}-01T12:00:00`
+  );
 
   return nextMonthDate.toLocaleDateString("en-CA", {
     month: "long",
     day: "numeric",
     year: "numeric",
+    timeZone: BUSINESS_TIME_ZONE,
   });
 }
 
 function formatPhoneNumber(value) {
-  const numbers = value.replace(/\D/g, "").slice(0, 10);
+  const numbers = String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
 
-  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 3) {
+    return numbers;
+  }
 
   if (numbers.length <= 6) {
     return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
   }
 
-  return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+  return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(
+    6
+  )}`;
 }
 
 function createSlotId(date, time) {
-  const cleanedTime = time
+  const cleanedTime = String(time || "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
@@ -111,9 +168,16 @@ function createSlotId(date, time) {
 }
 
 function timeToMinutes(time) {
-  if (!time) return 0;
+  if (!time || typeof time !== "string") {
+    return 0;
+  }
 
   const [hours, minutes] = time.split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return 0;
+  }
+
   return hours * 60 + minutes;
 }
 
@@ -154,8 +218,29 @@ function generateTimeSlots(openTime, closeTime, duration) {
 }
 
 function getDayOfWeek(dateString) {
+  if (!dateString) {
+    return null;
+  }
+
   const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day).getDay();
+
+  if (
+    Number.isNaN(year) ||
+    Number.isNaN(month) ||
+    Number.isNaN(day)
+  ) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day, 12, 0, 0).getDay();
+}
+
+function getFirebaseErrorCode(error) {
+  if (!error) {
+    return "";
+  }
+
+  return String(error.code || "").replace("firestore/", "");
 }
 
 export default function BookingForm() {
@@ -164,17 +249,27 @@ export default function BookingForm() {
   const [businessHours, setBusinessHours] = useState(defaultBusinessHours);
   const [closedDates, setClosedDates] = useState([]);
   const [appointmentDuration, setAppointmentDuration] = useState(60);
+
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
+
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
 
   useEffect(() => {
+    let isActive = true;
+
     async function loadSchedule() {
       try {
-        const settingsSnapshot = await getDoc(doc(db, "settings", "business"));
+        const settingsReference = doc(db, "settings", "business");
+        const settingsSnapshot = await getDoc(settingsReference);
+
+        if (!isActive) {
+          return;
+        }
 
         if (settingsSnapshot.exists()) {
           const settingsData = settingsSnapshot.data();
@@ -190,30 +285,54 @@ export default function BookingForm() {
               : []
           );
 
+          const savedDuration = Number(settingsData.appointmentDuration);
+
           setAppointmentDuration(
-            [30, 45, 60].includes(Number(settingsData.appointmentDuration))
-              ? Number(settingsData.appointmentDuration)
-              : 60
+            [30, 45, 60].includes(savedDuration) ? savedDuration : 60
           );
         }
       } catch (error) {
         console.error("Error loading business schedule:", error);
-        setStatus("Could not load the latest business schedule.");
-        setStatusType("error");
+
+        if (isActive) {
+          setStatus(
+            "Could not load the latest business schedule. Default hours are being shown."
+          );
+          setStatusType("error");
+        }
       } finally {
-        setIsLoadingSchedule(false);
+        if (isActive) {
+          setIsLoadingSchedule(false);
+        }
       }
     }
 
     loadSchedule();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const dailyTimes = useMemo(() => {
-    if (!form.date || !isCurrentBookingMonth(form.date)) return [];
+    if (!form.date || !isCurrentBookingMonth(form.date)) {
+      return [];
+    }
 
-    const schedule = businessHours[String(getDayOfWeek(form.date))];
+    const dayOfWeek = getDayOfWeek(form.date);
 
-    if (!schedule || schedule.closed || closedDates.includes(form.date)) {
+    if (dayOfWeek === null) {
+      return [];
+    }
+
+    const schedule =
+      businessHours[String(dayOfWeek)] || businessHours[dayOfWeek];
+
+    if (
+      !schedule ||
+      schedule.closed ||
+      closedDates.includes(form.date)
+    ) {
       return [];
     }
 
@@ -222,7 +341,12 @@ export default function BookingForm() {
       schedule.close,
       appointmentDuration
     );
-  }, [form.date, businessHours, closedDates, appointmentDuration]);
+  }, [
+    form.date,
+    businessHours,
+    closedDates,
+    appointmentDuration,
+  ]);
 
   const availableTimes = useMemo(() => {
     return dailyTimes.filter((time) => !bookedTimes.includes(time));
@@ -231,7 +355,12 @@ export default function BookingForm() {
   useEffect(() => {
     if (!form.date) {
       setBookedTimes([]);
-      setForm((currentForm) => ({ ...currentForm, time: "" }));
+
+      setForm((currentForm) => ({
+        ...currentForm,
+        time: "",
+      }));
+
       return;
     }
 
@@ -250,11 +379,13 @@ export default function BookingForm() {
 
         const snapshot = await getDocs(bookedSlotsQuery);
 
-        if (!isActive) return;
+        if (!isActive) {
+          return;
+        }
 
-        const unavailableTimes = snapshot.docs.map(
-          (slotDocument) => slotDocument.data().time
-        );
+        const unavailableTimes = snapshot.docs
+          .map((slotDocument) => slotDocument.data().time)
+          .filter(Boolean);
 
         setBookedTimes(unavailableTimes);
 
@@ -269,14 +400,34 @@ export default function BookingForm() {
       } catch (error) {
         console.error("Error loading booked times:", error);
 
-        if (!isActive) return;
+        if (!isActive) {
+          return;
+        }
+
+        const errorCode = getFirebaseErrorCode(error);
 
         setBookedTimes([]);
-        setStatus("Could not load available times. Please try again.");
+
+        if (errorCode === "permission-denied") {
+          setStatus(
+            "The booking system cannot read available appointments. Check your Firestore rules."
+          );
+        } else {
+          setStatus(
+            "Could not load available appointment times. Please refresh and try again."
+          );
+        }
+
         setStatusType("error");
-        setForm((currentForm) => ({ ...currentForm, time: "" }));
+
+        setForm((currentForm) => ({
+          ...currentForm,
+          time: "",
+        }));
       } finally {
-        if (isActive) setIsLoadingTimes(false);
+        if (isActive) {
+          setIsLoadingTimes(false);
+        }
       }
     }
 
@@ -295,7 +446,8 @@ export default function BookingForm() {
 
     setForm((currentForm) => ({
       ...currentForm,
-      [name]: name === "phone" ? formatPhoneNumber(value) : value,
+      [name]:
+        name === "phone" ? formatPhoneNumber(value) : value,
     }));
   }
 
@@ -313,7 +465,12 @@ export default function BookingForm() {
   async function book(event) {
     event.preventDefault();
 
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      return;
+    }
+
+    setStatus("");
+    setStatusType("");
 
     const trimmedName = form.name.trim();
     const phoneNumbers = form.phone.replace(/\D/g, "");
@@ -331,6 +488,12 @@ export default function BookingForm() {
       return;
     }
 
+    if (!form.service) {
+      setStatus("Please choose a service.");
+      setStatusType("error");
+      return;
+    }
+
     if (!form.date) {
       setStatus("Please choose an appointment date.");
       setStatusType("error");
@@ -338,7 +501,9 @@ export default function BookingForm() {
     }
 
     if (!isCurrentBookingMonth(form.date)) {
-      setStatus("You can only book appointments in the current month.");
+      setStatus(
+        "You can only book appointments in the current month."
+      );
       setStatusType("error");
       return;
     }
@@ -355,7 +520,16 @@ export default function BookingForm() {
       return;
     }
 
-    const daySchedule = businessHours[String(getDayOfWeek(form.date))];
+    const dayOfWeek = getDayOfWeek(form.date);
+
+    if (dayOfWeek === null) {
+      setStatus("The selected appointment date is invalid.");
+      setStatusType("error");
+      return;
+    }
+
+    const daySchedule =
+      businessHours[String(dayOfWeek)] || businessHours[dayOfWeek];
 
     if (!daySchedule || daySchedule.closed) {
       setStatus("The barber is closed on this day.");
@@ -363,8 +537,25 @@ export default function BookingForm() {
       return;
     }
 
-    if (!form.time || !availableTimes.includes(form.time)) {
-      setStatus("That time is no longer available. Choose another time.");
+    if (!form.time) {
+      setStatus("Please choose an appointment time.");
+      setStatusType("error");
+      return;
+    }
+
+    if (!dailyTimes.includes(form.time)) {
+      setStatus("That appointment time is not valid.");
+      setStatusType("error");
+      return;
+    }
+
+    if (
+      bookedTimes.includes(form.time) ||
+      !availableTimes.includes(form.time)
+    ) {
+      setStatus(
+        "That appointment is no longer available. Please choose another time."
+      );
       setStatusType("error");
       return;
     }
@@ -375,13 +566,15 @@ export default function BookingForm() {
 
     try {
       const slotId = createSlotId(form.date, form.time);
+
       const bookingReference = doc(db, "bookings", slotId);
       const slotReference = doc(db, "bookedSlots", slotId);
 
       await runTransaction(db, async (transaction) => {
-        const existingSlot = await transaction.get(slotReference);
+        const existingSlotSnapshot =
+          await transaction.get(slotReference);
 
-        if (existingSlot.exists()) {
+        if (existingSlotSnapshot.exists()) {
           throw new Error("slot-already-booked");
         }
 
@@ -391,7 +584,7 @@ export default function BookingForm() {
           service: form.service,
           date: form.date,
           time: form.time,
-          appointmentDuration,
+          appointmentDuration: Number(appointmentDuration),
           status: "upcoming",
           createdAt: serverTimestamp(),
         });
@@ -399,32 +592,57 @@ export default function BookingForm() {
         transaction.set(slotReference, {
           date: form.date,
           time: form.time,
-          appointmentDuration,
+          appointmentDuration: Number(appointmentDuration),
           createdAt: serverTimestamp(),
         });
       });
 
-      setBookedTimes((currentTimes) => [
-        ...new Set([...currentTimes, form.time]),
-      ]);
+      setBookedTimes((currentTimes) => {
+        return [...new Set([...currentTimes, form.time])];
+      });
 
       setCalendarRefreshKey((currentKey) => currentKey + 1);
 
-      setStatus("Appointment booked! We look forward to seeing you.");
+      setStatus(
+        "Appointment booked! We look forward to seeing you."
+      );
       setStatusType("success");
+
       setForm(startingForm);
     } catch (error) {
       console.error("Booking error:", error);
 
-      if (
-        error.message === "slot-already-booked" ||
-        error.code === "permission-denied"
-      ) {
+      const errorCode = getFirebaseErrorCode(error);
+      const errorMessage = String(error?.message || "");
+
+      if (errorMessage === "slot-already-booked") {
+        setBookedTimes((currentTimes) => {
+          return [...new Set([...currentTimes, form.time])];
+        });
+
         setStatus(
-          "That appointment was just booked by someone else. Choose another time."
+          "That appointment has already been booked. Please choose another time."
+        );
+      } else if (errorCode === "permission-denied") {
+        setStatus(
+          "The booking system does not have permission to save appointments. Check the Firestore rules."
+        );
+      } else if (errorCode === "unavailable") {
+        setStatus(
+          "The booking service is temporarily unavailable. Please try again in a moment."
+        );
+      } else if (errorCode === "failed-precondition") {
+        setStatus(
+          "The booking could not be completed because Firebase is missing a required setup. Check the browser console."
+        );
+      } else if (errorCode === "unauthenticated") {
+        setStatus(
+          "Firebase rejected the booking because authentication is required."
         );
       } else {
-        setStatus("Something went wrong. Please try again.");
+        setStatus(
+          "Something went wrong while saving the appointment. Check the browser console for the exact error."
+        );
       }
 
       setStatusType("error");
@@ -446,14 +664,19 @@ export default function BookingForm() {
         </p>
 
         <p className="mt-1 text-sm text-zinc-300">
-          Bookings for the next month open on {getNextMonthOpeningText()} at
-          12:00 AM.
+          Bookings for the next month open on{" "}
+          {getNextMonthOpeningText()} at 12:00 AM.
         </p>
       </div>
 
-      <form onSubmit={book} className="grid w-full grid-cols-1 gap-5">
+      <form
+        onSubmit={book}
+        className="grid w-full grid-cols-1 gap-5"
+      >
         <label className="grid gap-2">
-          <span className="text-sm font-semibold sm:text-base">Name</span>
+          <span className="text-sm font-semibold sm:text-base">
+            Name
+          </span>
 
           <input
             type="text"
@@ -491,7 +714,9 @@ export default function BookingForm() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-sm font-semibold sm:text-base">Service</span>
+          <span className="text-sm font-semibold sm:text-base">
+            Service
+          </span>
 
           <select
             name="service"
@@ -514,7 +739,9 @@ export default function BookingForm() {
 
           {isLoadingSchedule ? (
             <div className="flex min-h-72 items-center justify-center rounded-2xl border border-zinc-700 bg-black">
-              <p className="text-zinc-400">Loading schedule...</p>
+              <p className="text-zinc-400">
+                Loading schedule...
+              </p>
             </div>
           ) : (
             <BookingCalendar
@@ -531,18 +758,23 @@ export default function BookingForm() {
           {form.date && (
             <p className="text-sm font-semibold text-yellow-400">
               Selected date:{" "}
-              {new Date(`${form.date}T00:00:00`).toLocaleDateString("en-CA", {
+              {new Date(
+                `${form.date}T12:00:00`
+              ).toLocaleDateString("en-CA", {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
                 year: "numeric",
+                timeZone: BUSINESS_TIME_ZONE,
               })}
             </p>
           )}
         </div>
 
         <label className="grid gap-2">
-          <span className="text-sm font-semibold sm:text-base">Time</span>
+          <span className="text-sm font-semibold sm:text-base">
+            Time
+          </span>
 
           <select
             name="time"
@@ -557,10 +789,14 @@ export default function BookingForm() {
             required
             className={fieldClasses}
           >
-            {!form.date && <option value="">Choose a date first</option>}
+            {!form.date && (
+              <option value="">Choose a date first</option>
+            )}
 
             {form.date && isLoadingTimes && (
-              <option value="">Loading available times...</option>
+              <option value="">
+                Loading available times...
+              </option>
             )}
 
             {form.date &&
@@ -597,6 +833,7 @@ export default function BookingForm() {
             formDisabled ||
             isLoadingTimes ||
             !form.date ||
+            !form.time ||
             availableTimes.length === 0
           }
           className="mt-1 w-full rounded-xl bg-yellow-400 px-4 py-4 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"

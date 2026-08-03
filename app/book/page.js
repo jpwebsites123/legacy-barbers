@@ -1,29 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 
 import BookingForm from "../../components/BookingForm";
 import { db } from "../../lib/firebase";
 import { siteConfig } from "../../lib/siteConfig";
 
+const BUSINESS_TIME_ZONE = "America/Toronto";
+
+function getCurrentBookingMonth() {
+  return new Intl.DateTimeFormat("en-CA", {
+    month: "long",
+    year: "numeric",
+    timeZone: BUSINESS_TIME_ZONE,
+  }).format(new Date());
+}
+
 const defaultSettings = {
-  bookingMonth: siteConfig.booking?.bookingMonth || "July 2026",
   bookingsOpen: siteConfig.booking?.bookingsOpen ?? true,
   bookingOpenDate: siteConfig.booking?.bookingOpenDate || "",
   bookingOpenTime: siteConfig.booking?.bookingOpenTime || "10:00",
 };
 
 function formatTime(time) {
-  if (!time) {
+  if (!time || typeof time !== "string") {
     return "10:00 AM";
   }
 
-  const [hours, minutes] = time.split(":");
+  const [hours = "", minutes = "00"] = time.split(":");
   const hourNumber = Number(hours);
 
-  if (Number.isNaN(hourNumber)) {
+  if (
+    Number.isNaN(hourNumber) ||
+    hourNumber < 0 ||
+    hourNumber > 23
+  ) {
     return time;
   }
 
@@ -34,11 +47,11 @@ function formatTime(time) {
 }
 
 function formatDate(date) {
-  if (!date) {
+  if (!date || typeof date !== "string") {
     return "";
   }
 
-  const parsedDate = new Date(`${date}T00:00:00`);
+  const parsedDate = new Date(`${date}T12:00:00`);
 
   if (Number.isNaN(parsedDate.getTime())) {
     return date;
@@ -48,6 +61,7 @@ function formatDate(date) {
     month: "long",
     day: "numeric",
     year: "numeric",
+    timeZone: BUSINESS_TIME_ZONE,
   });
 }
 
@@ -58,35 +72,71 @@ export default function BookPage() {
 
   const bookingPage = siteConfig.bookingPage;
 
+  const bookingMonth = useMemo(() => {
+    return getCurrentBookingMonth();
+  }, []);
+
   useEffect(() => {
+    let isMounted = true;
+
     async function loadSettings() {
       try {
+        setSettingsError("");
+
         const settingsReference = doc(db, "settings", "business");
         const settingsSnapshot = await getDoc(settingsReference);
 
+        if (!isMounted) {
+          return;
+        }
+
         if (settingsSnapshot.exists()) {
+          const firebaseSettings = settingsSnapshot.data();
+
           setSettings({
-            ...defaultSettings,
-            ...settingsSnapshot.data(),
+            bookingsOpen:
+              typeof firebaseSettings.bookingsOpen === "boolean"
+                ? firebaseSettings.bookingsOpen
+                : defaultSettings.bookingsOpen,
+
+            bookingOpenDate:
+              typeof firebaseSettings.bookingOpenDate === "string"
+                ? firebaseSettings.bookingOpenDate
+                : defaultSettings.bookingOpenDate,
+
+            bookingOpenTime:
+              typeof firebaseSettings.bookingOpenTime === "string"
+                ? firebaseSettings.bookingOpenTime
+                : defaultSettings.bookingOpenTime,
           });
+        } else {
+          setSettings(defaultSettings);
         }
       } catch (error) {
         console.error("Error loading booking settings:", error);
 
-        setSettingsError(
-          "We could not load the latest booking information."
-        );
+        if (isMounted) {
+          setSettings(defaultSettings);
+          setSettingsError(
+            "We could not load the latest booking information."
+          );
+        }
       } finally {
-        setLoadingSettings(false);
+        if (isMounted) {
+          setLoadingSettings(false);
+        }
       }
     }
 
     loadSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const {
     bookingsOpen,
-    bookingMonth,
     bookingOpenDate,
     bookingOpenTime,
   } = settings;
@@ -137,13 +187,17 @@ export default function BookPage() {
 
                   <div className="mt-4 flex items-center gap-3 sm:mt-5">
                     <span
-                      className={`glow h-3 w-3 shrink-0 rounded-full ${bookingsOpen ? "bg-green-500" : "bg-red-500"
-                        }`}
+                      className={`glow h-3 w-3 shrink-0 rounded-full ${
+                        bookingsOpen ? "bg-green-500" : "bg-red-500"
+                      }`}
                     />
 
                     <p
-                      className={`text-sm font-bold sm:text-base ${bookingsOpen ? "text-green-400" : "text-red-400"
-                        }`}
+                      className={`text-sm font-bold sm:text-base ${
+                        bookingsOpen
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
                     >
                       {bookingsOpen
                         ? "Bookings Are Open"
@@ -161,7 +215,7 @@ export default function BookPage() {
             </div>
 
             {/* Before You Book */}
-            <div className="w-full premium-card fade-up p-5  sm:p-7">
+            <div className="premium-card fade-up w-full p-5 sm:p-7">
               <h2 className="text-2xl font-bold">
                 {bookingPage.beforeBookingTitle}
               </h2>
@@ -192,7 +246,7 @@ export default function BookPage() {
           </div>
 
           {/* Right Column */}
-          <div className="w-full min-w-0 max-w-full overflow-hidden premium-card fade-up p-4 shadow-2xl sm:p-8">
+          <div className="premium-card fade-up w-full min-w-0 max-w-full overflow-hidden p-4 shadow-2xl sm:p-8">
             {loadingSettings ? (
               <div className="flex min-h-[420px] items-center justify-center">
                 <div className="text-center">
@@ -219,7 +273,7 @@ export default function BookPage() {
                   </p>
                 </div>
 
-                <BookingForm />
+                <BookingForm bookingMonth={bookingMonth} />
               </>
             ) : (
               <div className="py-12 text-center sm:py-16">
